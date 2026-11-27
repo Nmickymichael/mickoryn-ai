@@ -1,18 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import type { User } from '@supabase/supabase-js'
-import { Activity, AudioLines, BrainCircuit, Cpu, LockKeyhole, Mic, Send, ShieldCheck, Sparkles, Volume2, LogOut } from 'lucide-react'
+import { BrainCircuit, LockKeyhole, Mic, Send, ShieldCheck, Volume2, LogOut } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import type { ChatMessage } from './core/types'
 import { listenOnce, speak } from './voice/speech'
-
-const agents = [
-  ['JARVIS', 'Personal assistant', 'Message, planning and everyday reasoning'],
-  ['THE MACHINE', 'Intelligence engine', 'Patterns and authorized data analysis'],
-  ['SAMARITAN', 'Strategic intelligence', 'Scenarios, risks and decision support'],
-  ['E.D.I.T.H.', 'Integration layer', 'Connected apps and approved workflows'],
-  ['ZOLA', 'Predictive analytics', 'Trends, probabilities and forecasting'],
-] as const
 
 function AuthPanel() {
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
@@ -64,7 +56,6 @@ export default function App() {
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
-  const [agent, setAgent] = useState('JARVIS')
   const [notice, setNotice] = useState('')
 
   useEffect(() => {
@@ -111,10 +102,9 @@ export default function App() {
       if (error) throw error
       if (data?.error) throw new Error(data.error)
       const answer = typeof data?.answer === 'string' ? data.answer : 'The intelligence core returned an empty response.'
-      setAgent(String(data.agent ?? 'jarvis').toUpperCase())
       const { error: assistantMessageError } = await supabase.from('ai_messages').insert({
         conversation_id: activeConversation, user_id: user.id, role: 'assistant',
-        content: answer, agent: data.agent ?? 'jarvis', provider: data.provider ?? 'unknown',
+        content: answer, agent: 'mickoryn', provider: data.provider ?? 'demo',
       })
       if (assistantMessageError) throw assistantMessageError
       setMessages([...next, { role: 'assistant', content: answer }])
@@ -138,30 +128,25 @@ export default function App() {
       <div className="nav-label">COMMAND</div>
       <a className="nav active"><Activity size={17}/> Overview</a>
       <a className="nav"><BrainCircuit size={17}/> Intelligence core</a>
-      <a className="nav"><Cpu size={17}/> Agent network</a>
-      <a className="nav"><AudioLines size={17}/> Voice interface</a>
       <a className="nav"><LockKeyhole size={17}/> Memory & privacy</a>
       <div className="sidebar-bottom"><ShieldCheck size={17}/><span>Privacy-first architecture</span></div>
     </aside>
     <section className="main">
       <header><div><span className="eyebrow">PERSONAL INTELLIGENCE PLATFORM</span><h1>Central command</h1><small className="user-email">{user.email}</small></div><div className="header-actions"><div className="online"><i/> CORE READY</div><button className="logout" onClick={() => void supabase.auth.signOut()} title="Sign out"><LogOut size={15}/> Sign out</button></div></header>
       <section className="hero">
-        <div><span className="eyebrow">MICKORYN CORE / VERSION 0.2</span><h2>One intelligence.<br/><em>Multiple minds.</em></h2><p>Your central interface for reasoning, memory, analysis and authorized operations.</p></div>
+        <div><span className="eyebrow">MICKORYN CORE / VERSION 0.2</span><h2>One intelligence.<br/><em>One identity.</em></h2><p>One personal AI assistant for reasoning, memory, planning and authorized actions.</p></div>
         <div className="orb"><div className="orb-inner"><BrainCircuit size={54}/></div></div>
       </section>
       <div className="status-grid">
         <div className="status-card"><span>AI PROVIDER</span><b>DEMO SIMULATION</b><small>Real model awaits server-side API key</small></div>
         <div className="status-card"><span>DATABASE</span><b>CONNECTED</b><small>Supabase · authenticated session</small></div>
-        <div className="status-card"><span>ACTIVE SPECIALIST</span><b>{agent}</b><small>Server-side intent routing</small></div>
       </div>
-      <div className="section-heading"><div><span className="eyebrow">SPECIALIZED INTELLIGENCE</span><h3>Agent network</h3></div><span className="muted">5 specialist modules</span></div>
-      <div className="agent-grid">{agents.map(([name, role, desc], i) => <div className="agent-card" key={name}><div className="agent-icon">{i === 0 ? <Sparkles/> : i === 1 ? <Activity/> : i === 2 ? <Cpu/> : i === 3 ? <AudioLines/> : <BrainCircuit/>}</div><b>{name}</b><span>{role}</span><p>{desc}</p></div>)}</div>
       <section className="chat">
         <div className="chat-head"><div><span className="eyebrow">SECURE CONVERSATION</span><h3>Talk to MICKORYN</h3></div><span className="mode">TEXT + VOICE</span></div>
         <div className="messages">{messages.map((m, i) => <div className={`bubble ${m.role}`} key={i}><span>{m.role === 'assistant' ? 'MICKORYN' : 'YOU'}</span><p>{m.content}</p>{m.role === 'assistant' && <button className="speak" onClick={() => speak(m.content)} title="Read aloud"><Volume2 size={15}/></button>}</div>)}{busy && <div className="typing">CORE PROCESSING…</div>}</div>
         {notice && <p className="notice">{notice}</p>}
         <div className="composer"><button className="icon-button" onClick={startVoice} title="Speak"><Mic size={19}/></button><input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && void sendMessage()} placeholder="Send a command to your intelligence core…"/><button className="send" onClick={() => void sendMessage()} disabled={busy || !input.trim()}><Send size={17}/></button></div>
-        <p className="disclaimer">Your messages are saved to your private account. Demo mode is simulated and does not execute external actions.</p>
+        <p className="disclaimer">Your messages are saved to your private account. Demo mode is temporary and does not yet provide real AI reasoning.</p>
       </section>
       <footer><span>MICKORYN AI © 2026</span><span>BUILT FOR PRIVACY · HUMAN CONTROL · CLARITY</span></footer>
     </section>
