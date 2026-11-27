@@ -76,14 +76,26 @@ using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id)
 create policy "Users manage own conversations" on public.ai_conversations for all to authenticated
 using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
-create policy "Users manage own messages" on public.ai_messages for all to authenticated
-using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
+create policy "Users manage own conversation messages" on public.ai_messages for all to authenticated
+using (
+  (select auth.uid()) = user_id
+  and exists (select 1 from public.ai_conversations c where c.id = ai_messages.conversation_id and c.user_id = (select auth.uid()))
+)
+with check (
+  (select auth.uid()) = user_id
+  and exists (select 1 from public.ai_conversations c where c.id = ai_messages.conversation_id and c.user_id = (select auth.uid()))
+);
 
 create policy "Users manage own memories" on public.ai_memories for all to authenticated
 using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
 
 create policy "Users read own agent runs" on public.ai_agent_runs for select to authenticated
-using ((select auth.uid()) = user_id);
+using (
+  (select auth.uid()) = user_id
+  and (conversation_id is null or exists (
+    select 1 from public.ai_conversations c where c.id = ai_agent_runs.conversation_id and c.user_id = (select auth.uid())
+  ))
+);
 
 create policy "Users read own audit logs" on public.ai_audit_logs for select to authenticated
 using ((select auth.uid()) = user_id);
