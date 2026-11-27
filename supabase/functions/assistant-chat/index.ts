@@ -1,96 +1,107 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Max-Age": "86400",
+  "Vary": "Origin",
 };
 
-const coreIdentity = `You are MICKORYN AI, a helpful personal intelligence assistant.
-Principles: honesty, privacy, user control, safety and practical usefulness.
-Never claim to access an account, device, camera, location, file or external service unless an authorized tool returned that information.
-Never invent completed actions. Ask for confirmation before consequential external actions.
-Distinguish evidence, assumptions and forecasts. Do not conduct covert surveillance.`;
+function jsonResponse(body: Record<string, unknown>, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, "Content-Type": "application/json; charset=utf-8" },
+  });
+}
 
-Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return Response.json({ error: "Method not allowed" }, { status: 405, headers: corsHeaders });
+/**
+ * Supabase verifies the JWT signature before this function runs because
+ * verify_jwt is enabled on deployment. We read the verified token's subject
+ * only to confirm that this request belongs to an authenticated user.
+ */
+function getVerifiedUserId(authorization: string | null): string | null {
+  if (!authorization?.startsWith("Bearer ")) return null;
+
+  const token = authorization.slice(7).trim();
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
 
   try {
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return Response.json({ error: "Sign in to use MICKORYN AI." }, { status: 401, headers: corsHeaders });
+    const payloadPart = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = payloadPart.padEnd(Math.ceil(payloadPart.length / 4) * 4, "=");
+    const payload = JSON.parse(atob(padded));
+    return typeof payload.sub === "string" && payload.sub.length > 0
+      ? payload.sub
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+Deno.serve(async (req: Request): Promise<Response> => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { status: 200, headers: corsHeaders });
+  }
+
+  if (req.method !== "POST") {
+    return jsonResponse({ error: "Method not allowed." }, 405);
+  }
+
+  try {
+    // The Supabase Edge gateway validates the JWT (verify_jwt: true).
+    const userId = getVerifiedUserId(req.headers.get("Authorization"));
+    if (!userId) {
+      return jsonResponse({ error: "Your session is missing or invalid. Please sign in again." }, 401);
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL");
-    const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
-    if (!supabaseUrl || !anonKey) throw new Error("Supabase function environment is incomplete.");
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return jsonResponse({ error: "The request body must be valid JSON." }, 400);
+    }
 
-    const supabase = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
+    const message =
+      body && typeof body === "object" && "message" in body &&
+      typeof (body as { message?: unknown }).message === "string"
+        ? (body as { message: string }).message.trim()
+        : "";
+
+    if (!message) {
+      return jsonResponse({ error: "Please enter a message before sending." }, 400);
+    }
+
+    if (message.length > 8000) {
+      return jsonResponse({ error: "Messages must be 8,000 characters or fewer." }, 400);
+    }
+
+    // Free-first Demo Mode: no model provider is called and no API key is required.
+    // This deliberately returns a successful response while clearly identifying
+    // that the reply is a delivery/test response, not genuine AI reasoning.
+    const answer =
+      "MICKORYN Demo Mode received your message successfully. " +
+      "Your authenticated chat connection is working, but a language model is not " +
+      "connected yet, so this reply does not contain AI-generated reasoning. " +
+      "Your message: " + message;
+
+    console.info("assistant-chat demo response", {
+      assistant: "mickoryn",
+      provider: "demo",
+      user_id: userId,
+      message_length: message.length,
     });
-    const token = authHeader.slice("Bearer ".length);
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) return Response.json({ error: "Your session is invalid. Please sign in again." }, { status: 401, headers: corsHeaders });
 
-    const body = await req.json().catch(() => null);
-    const message = typeof body?.message === "string" ? body.message.trim() : "";
-    if (!message || message.length > 8000) {
-      return Response.json({ error: "Message must contain between 1 and 8,000 characters." }, { status: 400, headers: corsHeaders });
-    }
-
-    const provider = "demo"; // Free-first mode: never call paid AI APIs until explicitly re-enabled.
-    let answer = "";
-    let simulated = true;
-
-    if (provider === "openai") {
-      const apiKey = Deno.env.get("OPENAI_API_KEY");
-      if (!apiKey) return Response.json({ error: "OpenAI is selected but its server-side API key is not configured." }, { status: 503, headers: corsHeaders });
-
-      const history = Array.isArray(body?.history) ? body.history
-        .filter((item: unknown) => item && typeof item === "object" &&
-          ["user", "assistant"].includes((item as { role?: string }).role ?? "") &&
-          typeof (item as { content?: unknown }).content === "string")
-        .slice(-10)
-        .map((item: { role: "user" | "assistant"; content: string }) => ({
-          role: item.role,
-          content: item.content.slice(0, 8000),
-        })) : [];
-
-      const response = await fetch("https://api.openai.com/v1/responses", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: Deno.env.get("OPENAI_MODEL") ?? "gpt-4.1-mini",
-          instructions: `${coreIdentity}\n\nSpecialist assignment: ${specialists[agent]}`,
-          input: [...history, { role: "user", content: message }],
-          store: false,
-        }),
-      });
-      const result = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        console.error("OpenAI request failed", response.status, result?.error?.message ?? "unknown");
-        return Response.json({ error: "The AI provider could not complete this request." }, { status: 502, headers: corsHeaders });
-      }
-      answer = (result.output ?? []).flatMap((item: { content?: Array<{ type?: string; text?: string }> }) => item.content ?? [])
-        .filter((part: { type?: string }) => part.type === "output_text")
-        .map((part: { text?: string }) => part.text ?? "").join("\n");
-      simulated = false;
-    } else {
-      answer = `[DEMO MODE — simulated response; no AI model was called]\n\nYour request was routed to ${agent.toUpperCase()}. Connect a funded OpenAI API key in the function secrets to enable real model reasoning.`;
-    }
-
-    const { error: auditError } = await supabase.from("ai_audit_logs").insert({
-      user_id: user.id,
-      event_type: "assistant_request",
-      details: { assistant: "mickoryn", provider, simulated },
+    return jsonResponse({
+      answer,
+      assistant: "mickoryn",
+      provider: "demo",
+      simulated: true,
+      mode: "demo",
     });
-    if (auditError) console.error("Audit log insert failed", auditError.message);
-
-    return Response.json({ answer, assistant: "mickoryn", provider, simulated }, { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error) {
-    console.error("assistant-chat error", error);
-    return Response.json({ error: "An unexpected server error occurred." }, { status: 500, headers: corsHeaders });
+    // Keep internal details in server logs; do not expose secrets to the browser.
+    console.error("assistant-chat unexpected error", error);
+    return jsonResponse({ error: "MICKORYN could not process this request. Please try again." }, 500);
   }
 });
