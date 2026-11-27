@@ -126,7 +126,7 @@ export default function App() {
     <aside className="sidebar">
       <div className="brand"><div className="brand-mark"><BrainCircuit size={24}/></div><div><b>MICKORYN</b><small>INTELLIGENCE SYSTEM</small></div></div>
       <div className="nav-label">COMMAND</div>
-      <a className="nav active"><Activity size={17}/> Overview</a>
+      <a className="nav active"><BrainCircuit size={17}/> Overview</a>
       <a className="nav"><BrainCircuit size={17}/> Intelligence core</a>
       <a className="nav"><LockKeyhole size={17}/> Memory & privacy</a>
       <div className="sidebar-bottom"><ShieldCheck size={17}/><span>Privacy-first architecture</span></div>
