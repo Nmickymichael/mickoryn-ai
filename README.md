@@ -4,27 +4,55 @@
 
 MICKORYN AI is a modular, privacy-conscious personal intelligence platform inspired by JARVIS, The Machine, Samaritan, E.D.I.T.H. and ZOLA.
 
-## Current status
+## Live backend configuration
 
-This is the initial central-core scaffold (v0.1). It includes a React + TypeScript dashboard, specialist routing contracts, a demo provider, Supabase schema and an authenticated Edge Function starter. It is not a finished autonomous AI system; specialist capabilities will be added incrementally with permission boundaries and tests.
+- Supabase project: `mickoryn-ai` (`sxirojgbtcmwwiywbbqr`)
+- Region: `eu-west-1`
+- Core schema: applied; six tables with Row Level Security
+- Edge Function: `assistant-chat`, deployed with JWT verification
+- Frontend: React + TypeScript + Vite; Supabase Auth, per-user conversations and message persistence
+- AI provider: demo mode until an OpenAI API key is configured server-side
 
-## Free-first model
+## Local setup
 
-- Frontend: Netlify free tier or local development.
-- Database/auth: Supabase free tier, subject to current quotas.
-- AI: demo mode works without API spending. Real OpenAI API calls require a separately funded API account; a ChatGPT subscription does not include API credits.
-- Voice: browser speech APIs where supported.
+```bash
+npm install
+cp .env.example .env.local
+npm run dev
+```
 
-## Security
+The frontend includes safe public Supabase URL and publishable-key defaults for this dedicated project. Override them with environment variables if needed.
 
-RLS, per-user ownership, server-side secrets, scoped integrations, explicit approval for consequential actions, and audit logs. No covert surveillance or autonomous weapons control.
+## Enable real model reasoning
 
-## Roadmap
+The Edge Function currently runs in demo mode. To enable OpenAI, add these secrets in Supabase Dashboard → Edge Functions → Secrets:
 
-1. Connect a dedicated Supabase project and apply the migration.
-2. Deploy and test the authenticated Edge Function.
-3. Add approved memory retrieval.
-4. Implement the five bounded specialist modules.
-5. Add consent-based integrations and voice improvements.
+- `AI_PROVIDER=openai`
+- `OPENAI_API_KEY=<your API key>`
+- `OPENAI_MODEL=gpt-4.1-mini` (optional; this is the default)
 
-See `docs/ROADMAP.md` for milestones.
+The OpenAI API is billed separately from a ChatGPT subscription. Never put the API key in frontend environment variables or GitHub.
+
+## Five specialist engines
+
+- **JARVIS** — conversational assistant and personal workflows
+- **THE MACHINE** — patterns and anomalies in user-authorized data
+- **SAMARITAN** — strategic scenarios, risk analysis and forecasting
+- **E.D.I.T.H.** — authorized integrations and action orchestration
+- **ZOLA** — predictive analytics and trends
+
+Specialist names currently represent bounded routing/instruction profiles, not five independently trained models or autonomous agents.
+
+## Security principles
+
+- Supabase Auth for user identity
+- Row Level Security on all user-data tables
+- User-scoped conversations, messages and memories
+- Server-side AI credentials only
+- Explicit approval before consequential external actions
+- No covert surveillance or autonomous weapons control
+- OpenAI Responses requests use `store: false`
+
+## Current limitations
+
+This is an early working foundation, not a finished autonomous platform. Integrations, long-term memory retrieval, agent-specific tools, rate limiting, automated tests, deployment and a full security review remain on the roadmap. Voice input/output depends on browser support.
