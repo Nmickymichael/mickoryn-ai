@@ -89,4 +89,8 @@ create policy "Users read own audit logs" on public.ai_audit_logs for select to 
 using ((select auth.uid()) = user_id);
 
 grant select, insert, update, delete on public.ai_profiles, public.ai_conversations, public.ai_messages, public.ai_memories to authenticated;
-grant select on public.ai_agent_runs, public.ai_audit_logs to authenticated;
+create policy "Users create own audit logs" on public.ai_audit_logs for insert to authenticated
+with check ((select auth.uid()) = user_id);
+
+grant select on public.ai_agent_runs to authenticated;
+grant select, insert on public.ai_audit_logs to authenticated;
